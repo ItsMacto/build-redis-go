@@ -15,8 +15,10 @@ import (
 const nullBulkString = "$-1\r\n"
 
 type entry struct {
-	value  string
-	expiry time.Time // zero value means no expiry
+	value    string
+	list     []string
+	dataType string    // value or list
+	expiry   time.Time // zero value means no expiry
 }
 
 type Store struct {
@@ -55,6 +57,18 @@ func (s *Store) Get(key string) (string, bool) {
 	return e.value, true
 }
 
+func (s *Store) RPush(key, value string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	e, ok := s.data[key]
+	if !ok {
+		e = entry{dataType: "list"}
+		s.data[key] = e
+	}
+	e.list = append(e.list, value)
+	return len(e.list)
+}
 func main() {
 	fmt.Println("Logs from your program will appear here!")
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
@@ -121,7 +135,11 @@ func dispatch(args []string, store *Store) []byte {
 			return []byte(nullBulkString)
 		}
 		return encodeBulkString(val)
-
+	case "RPUSH":
+		if len(args) < 3 {
+			return []byte("-ERR wrong number of arguments for 'rpush'\r\n")
+		}
+		return fmt.Appendf(nil, ":%d\r\n", store.RPush(args[1], args[2]))
 	default:
 		return []byte("-ERR unknown command\r\n")
 	}
