@@ -5,7 +5,10 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 )
+
+const NullBulkString = "$-1\r\n"
 
 func main() {
 	fmt.Println("Logs from your program will appear here!")
@@ -14,12 +17,12 @@ func main() {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
-
-	consumeListner(l)
+	store := NewStore()
+	consumeListner(l, store)
 
 }
 
-func consumeListner(l net.Listener) {
+func consumeListner(l net.Listener, store *Store) {
 
 	for {
 		conn, err := l.Accept()
@@ -29,11 +32,11 @@ func consumeListner(l net.Listener) {
 			os.Exit(1)
 		}
 
-		go handleConnection(conn)
+		go handleConnection(conn, store)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, store *Store) {
 	buf := make([]byte, 1024)
 	for {
 		n, err := conn.Read(buf)
@@ -55,6 +58,16 @@ func handleConnection(conn net.Conn) {
 				fmt.Println("ECHO command requires an argument")
 			}
 			conn.Write(encodeBulkString(decoded[1]))
+		case "SET":
+			store.Set(decoded[1], decoded[2])
+			conn.Write([]byte("+OK\r\n"))
+		case "GET":
+			val, ok := store.Get(decoded[1])
+			if !ok {
+				conn.Write([]byte(NullBulkString))
+			} else {
+				conn.Write(encodeBulkString(val))
+			}
 		}
 	}
 }
@@ -81,4 +94,30 @@ func decodeCommand(data []byte) ([]string, error) {
 func encodeBulkString(s string) []byte {
 	var res = fmt.Appendf(nil, "$%d\r\n%s\r\n", len(s), s)
 	return res
+}
+
+type Store struct {
+	data map[string]string
+	mu   sync.RWMutex
+}
+
+func NewStore() *Store {
+	return &Store{
+		data: make(map[string]string),
+	}
+}
+
+func (s *Store) Set(key, value string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.data[key] = value
+}
+
+func (s *Store) Get(key string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	value, ok := s.data[key]
+	return value, ok
 }
