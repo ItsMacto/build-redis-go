@@ -79,6 +79,6 @@ func decodeCommand(data []byte) ([]string, error) {
 }
 
 func encodeCommand(cmd []string) []byte {
-	var res = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(cmd), cmd))
+	var res = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(cmd[0]), cmd[0]))
 	return res
 }
