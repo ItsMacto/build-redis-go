@@ -23,5 +23,16 @@ func main() {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
-	conn.Write([]byte("+PONG\r\n"))
+	buf := make([]byte, 1024)
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading from connection: ", err.Error())
+			os.Exit(1)
+		}
+		data := buf[:n]
+		if data[0] == '*' && string(data[1:6]) == "PING\r\n" {
+			conn.Write([]byte("+PONG\r\n"))
+		}
+	}
 }
