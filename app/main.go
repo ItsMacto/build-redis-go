@@ -47,14 +47,14 @@ func handleConnection(conn net.Conn) {
 			fmt.Println("Error decoding command: ", err.Error())
 			continue
 		}
-		switch decoded[0] {
+		switch strings.ToUpper(decoded[0]) {
 		case "PING":
 			conn.Write([]byte("+PONG\r\n"))
 		case "ECHO":
 			if len(decoded) < 2 {
 				fmt.Println("ECHO command requires an argument")
 			}
-			conn.Write(encodeCommand(decoded[1:]))
+			conn.Write(encodeBulkString(decoded[1]))
 		}
 	}
 }
@@ -78,7 +78,7 @@ func decodeCommand(data []byte) ([]string, error) {
 	return res, nil
 }
 
-func encodeCommand(cmd []string) []byte {
-	var res = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(cmd[0]), cmd[0]))
+func encodeBulkString(s string) []byte {
+	var res = fmt.Appendf(nil, "$%d\r\n%s\r\n", len(s), s)
 	return res
 }
