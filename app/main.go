@@ -31,8 +31,8 @@ func main() {
 			os.Exit(1)
 		}
 		data := buf[:n]
-		if data[0] == '*' && string(data[1:6]) == "PING\r\n" {
+		// if data[0] == '*' && string(data[1:6]) == "PING\r\n" {
 			conn.Write([]byte("+PONG\r\n"))
-		}
+		// }
 	}
 }
