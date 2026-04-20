@@ -60,7 +60,7 @@ func handleConnection(conn net.Conn, store *Store) {
 			conn.Write(encodeBulkString(decoded[1]))
 		case "SET":
 			store.Set(decoded[1], decoded[2])
-			conn.Write([]byte("+OK\r\n"))
+			conn.Write(encodeSimpleString("OK"))
 		case "GET":
 			val, ok := store.Get(decoded[1])
 			if !ok {
@@ -94,6 +94,10 @@ func decodeCommand(data []byte) ([]string, error) {
 func encodeBulkString(s string) []byte {
 	var res = fmt.Appendf(nil, "$%d\r\n%s\r\n", len(s), s)
 	return res
+}
+
+func encodeSimpleString(str string) []byte {
+	return fmt.Appendf(nil, "+%s\r\n", str)
 }
 
 type Store struct {
