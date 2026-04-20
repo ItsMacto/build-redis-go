@@ -1,14 +1,59 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
-const NullBulkString = "$-1\r\n"
+const nullBulkString = "$-1\r\n"
+
+type entry struct {
+	value  string
+	expiry time.Time // zero value means no expiry
+}
+
+type Store struct {
+	mu   sync.RWMutex
+	data map[string]entry
+}
+
+func NewStore() *Store {
+	return &Store{data: make(map[string]entry)}
+}
+
+// Set stores value under key. A ttl of 0 means the key never expires.
+func (s *Store) Set(key, value string, ttl time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var expiry time.Time
+	if ttl > 0 {
+		expiry = time.Now().Add(ttl)
+	}
+	s.data[key] = entry{value: value, expiry: expiry}
+}
+
+// Get returns the value and true if the key exists and hasn't expired.
+func (s *Store) Get(key string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	e, ok := s.data[key]
+	if !ok {
+		return "", false
+	}
+	if !e.expiry.IsZero() && time.Now().After(e.expiry) {
+		return "", false
+	}
+	return e.value, true
+}
 
 func main() {
 	fmt.Println("Logs from your program will appear here!")
@@ -17,111 +62,160 @@ func main() {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
+	defer l.Close()
+
 	store := NewStore()
-	consumeListner(l, store)
-
-}
-
-func consumeListner(l net.Listener, store *Store) {
-
 	for {
 		conn, err := l.Accept()
-
 		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			os.Exit(1)
+			fmt.Println("Error accepting connection:", err)
+			continue
 		}
-
 		go handleConnection(conn, store)
 	}
 }
 
 func handleConnection(conn net.Conn, store *Store) {
-	buf := make([]byte, 1024)
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
 	for {
-		n, err := conn.Read(buf)
+		args, err := decodeCommand(reader)
 		if err != nil {
-			fmt.Println("Error reading from connection: ", err.Error())
-			os.Exit(1)
+			if err != io.EOF {
+				fmt.Println("Error decoding command:", err)
+			}
+			return
 		}
-		data := buf[:n]
-		decoded, err := decodeCommand(data)
-		if err != nil {
-			fmt.Println("Error decoding command: ", err.Error())
+		if len(args) == 0 {
 			continue
 		}
-		switch strings.ToUpper(decoded[0]) {
-		case "PING":
-			conn.Write([]byte("+PONG\r\n"))
-		case "ECHO":
-			if len(decoded) < 2 {
-				fmt.Println("ECHO command requires an argument")
-			}
-			conn.Write(encodeBulkString(decoded[1]))
-		case "SET":
-			store.Set(decoded[1], decoded[2])
-			conn.Write(encodeSimpleString("OK"))
-		case "GET":
-			val, ok := store.Get(decoded[1])
-			if !ok {
-				conn.Write([]byte(NullBulkString))
-			} else {
-				conn.Write(encodeBulkString(val))
-			}
+
+		response := dispatch(args, store)
+		if _, err := conn.Write(response); err != nil {
+			return
 		}
 	}
 }
 
-func decodeCommand(data []byte) ([]string, error) {
-	if len(data) < 5 || data[0] != '*' {
-		return nil, fmt.Errorf("invalid command format")
+func dispatch(args []string, store *Store) []byte {
+	switch strings.ToUpper(args[0]) {
+	case "PING":
+		return []byte("+PONG\r\n")
+
+	case "ECHO":
+		if len(args) < 2 {
+			return []byte("-ERR wrong number of arguments for 'echo'\r\n")
+		}
+		return encodeBulkString(args[1])
+
+	case "SET":
+		return handleSet(args, store)
+
+	case "GET":
+		if len(args) < 2 {
+			return []byte("-ERR wrong number of arguments for 'get'\r\n")
+		}
+		val, ok := store.Get(args[1])
+		if !ok {
+			return []byte(nullBulkString)
+		}
+		return encodeBulkString(val)
+
+	default:
+		return []byte("-ERR unknown command\r\n")
+	}
+}
+
+func handleSet(args []string, store *Store) []byte {
+	if len(args) < 3 {
+		return []byte("-ERR wrong number of arguments for 'set'\r\n")
+	}
+	key, value := args[1], args[2]
+
+	var ttl time.Duration
+	for i := 3; i < len(args); i++ {
+		switch strings.ToUpper(args[i]) {
+		case "PX":
+			if i+1 >= len(args) {
+				return []byte("-ERR syntax error\r\n")
+			}
+			ms, err := strconv.Atoi(args[i+1])
+			if err != nil || ms <= 0 {
+				return []byte("-ERR value is not an integer or out of range\r\n")
+			}
+			ttl = time.Duration(ms) * time.Millisecond
+			i++
+		case "EX":
+			if i+1 >= len(args) {
+				return []byte("-ERR syntax error\r\n")
+			}
+			sec, err := strconv.Atoi(args[i+1])
+			if err != nil || sec <= 0 {
+				return []byte("-ERR value is not an integer or out of range\r\n")
+			}
+			ttl = time.Duration(sec) * time.Second
+			i++
+		default:
+			return []byte("-ERR syntax error\r\n")
+		}
 	}
 
-	parts := strings.Split(string(data[1:]), "\r\n")
+	store.Set(key, value, ttl)
+	return []byte("+OK\r\n")
+}
 
-	var res []string
-	if len(parts) < 2 {
-		return res, nil
+// decodeCommand reads one RESP array of bulk strings from r.
+func decodeCommand(r *bufio.Reader) ([]string, error) {
+	line, err := readLine(r)
+	if err != nil {
+		return nil, err
+	}
+	if len(line) == 0 || line[0] != '*' {
+		return nil, fmt.Errorf("expected array, got %q", line)
+	}
+	count, err := strconv.Atoi(line[1:])
+	if err != nil {
+		return nil, fmt.Errorf("invalid array length: %w", err)
 	}
 
-	for i := 2; i < len(parts); i += 2 {
-		res = append(res, parts[i])
+	args := make([]string, count)
+	for i := 0; i < count; i++ {
+		header, err := readLine(r)
+		if err != nil {
+			return nil, err
+		}
+		if len(header) == 0 || header[0] != '$' {
+			return nil, fmt.Errorf("expected bulk string, got %q", header)
+		}
+		size, err := strconv.Atoi(header[1:])
+		if err != nil {
+			return nil, fmt.Errorf("invalid bulk string length: %w", err)
+		}
+		buf := make([]byte, size)
+		if _, err := io.ReadFull(r, buf); err != nil {
+			return nil, err
+		}
+		if _, err := r.Discard(2); err != nil { // trailing \r\n
+			return nil, err
+		}
+		args[i] = string(buf)
 	}
+	return args, nil
+}
 
-	return res, nil
+func readLine(r *bufio.Reader) (string, error) {
+	line, err := r.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimRight(line, "\r\n"), nil
 }
 
 func encodeBulkString(s string) []byte {
-	var res = fmt.Appendf(nil, "$%d\r\n%s\r\n", len(s), s)
-	return res
+	return fmt.Appendf(nil, "$%d\r\n%s\r\n", len(s), s)
 }
 
-func encodeSimpleString(str string) []byte {
-	return fmt.Appendf(nil, "+%s\r\n", str)
-}
-
-type Store struct {
-	data map[string]string
-	mu   sync.RWMutex
-}
-
-func NewStore() *Store {
-	return &Store{
-		data: make(map[string]string),
-	}
-}
-
-func (s *Store) Set(key, value string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.data[key] = value
-}
-
-func (s *Store) Get(key string) (string, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	value, ok := s.data[key]
-	return value, ok
+func encodeSimpleString(s string) []byte {
+	return fmt.Appendf(nil, "+%s\r\n", s)
 }
