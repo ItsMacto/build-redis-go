@@ -14,11 +14,19 @@ import (
 
 const nullBulkString = "$-1\r\n"
 
+type dataType int
+
+const (
+	typeNone dataType = iota
+	typeString
+	typeList
+)
+
 type entry struct {
 	value    string
 	list     []string
-	dataType string    // value or list
-	expiry   time.Time // zero value means no expiry
+	dataType dataType
+	expiry   time.Time
 }
 
 type Store struct {
@@ -39,7 +47,7 @@ func (s *Store) Set(key, value string, ttl time.Duration) {
 	if ttl > 0 {
 		expiry = time.Now().Add(ttl)
 	}
-	s.data[key] = entry{value: value, expiry: expiry}
+	s.data[key] = entry{value: value, expiry: expiry, dataType: typeString}
 }
 
 // Get returns the value and true if the key exists and hasn't expired.
@@ -63,10 +71,10 @@ func (s *Store) RPush(key, value string) int {
 
 	e, ok := s.data[key]
 	if !ok {
-		e = entry{dataType: "list"}
-		s.data[key] = e
+		e = entry{dataType: typeList}
 	}
 	e.list = append(e.list, value)
+	s.data[key] = e
 	return len(e.list)
 }
 func main() {
