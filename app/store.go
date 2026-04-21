@@ -111,3 +111,19 @@ func (s *Store) LRange(key string, start, stop int) ([]string, bool) {
 
 	return e.list[start : stop+1], true
 }
+func (s *Store) LLen(key string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+		e, ok := s.data[key]
+
+	if !ok || e.kind != typeList {
+		return 0
+	}
+	return len(e.list)
+
+
+
+
+
+

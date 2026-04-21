@@ -53,6 +53,11 @@ func dispatch(args []string, store *Store) []byte {
 			return []byte("-ERR wrong number of arguments for 'lpush'\r\n")
 		}
 		return fmt.Appendf(nil, ":%d\r\n", store.LPush(args[1], args[2:]))
+	case "LLEN":
+		if len(args) < 2 {
+			return []byte("-ERR wrong number of arguments for 'llen'\r\n")
+		}
+		return fmt.Appendf(nil, ":%d\r\n", store.LLen(args[1]))
 	default:
 		return []byte("-ERR unknown command\r\n")
 	}
