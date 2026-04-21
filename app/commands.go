@@ -30,6 +30,7 @@ func dispatch(args []string, store *Store) []byte {
 			return []byte(nullBulkString)
 		}
 		return encodeBulkString(val)
+
 	case "RPUSH":
 		if len(args) < 3 {
 			return []byte("-ERR wrong number of arguments for 'rpush'\r\n")

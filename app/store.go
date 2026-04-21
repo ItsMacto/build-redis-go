@@ -74,11 +74,23 @@ func (s *Store) LRange(key string, start, stop int) ([]string, bool) {
 	defer s.mu.RUnlock()
 
 	e, ok := s.data[key]
-	if !ok || e.kind != typeList || start >= len(e.list) || start > stop {
+	if !ok || e.kind != typeList {
 		return []string{}, false
 	}
-	start = max(0, start)
-	end := min(len(e.list), stop+1)
+	n := len(e.list)
 
-	return e.list[start:end], true
+	if start < 0 {
+		start = n + start
+	}
+	if stop < 0 {
+		stop = n + stop
+	}
+	start = max(0, start)
+	stop = min(n-1, stop)
+
+	if start > stop {
+		return []string{}, false
+	}
+
+	return e.list[start : stop+1], true
 }

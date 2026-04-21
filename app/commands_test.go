@@ -87,6 +87,12 @@ func TestDispatch_LRANGE(t *testing.T) {
 	if got := string(dispatch([]string{"LRANGE", "missing", "0", "5"}, s)); got != "*0\r\n" {
 		t.Fatalf("LRANGE missing got %q", got)
 	}
+	if got := string(dispatch([]string{"LRANGE", "k", "0", "-1"}, s)); got != "*5\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nc\r\n$1\r\nd\r\n$1\r\ne\r\n" {
+		t.Fatalf("LRANGE 0 -1 got %q", got)
+	}
+	if got := string(dispatch([]string{"LRANGE", "k", "-2", "-1"}, s)); got != "*2\r\n$1\r\nd\r\n$1\r\ne\r\n" {
+		t.Fatalf("LRANGE -2 -1 got %q", got)
+	}
 }
 
 func TestDispatch_WrongArity(t *testing.T) {

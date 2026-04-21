@@ -79,10 +79,18 @@ func TestStore_LRange(t *testing.T) {
 		{"whole range", "k", 0, 4, []string{"a", "b", "c", "d", "e"}},
 		{"first two", "k", 0, 1, []string{"a", "b"}},
 		{"middle", "k", 2, 4, []string{"c", "d", "e"}},
-		{"stop past end is clamped", "k", 0, 99, []string{"a", "b", "c", "d", "e"}},
-		{"start past end is empty", "k", 10, 20, []string{}},
+		{"stop past stop is clamped", "k", 0, 99, []string{"a", "b", "c", "d", "e"}},
+		{"start past stop is empty", "k", 10, 20, []string{}},
 		{"start > stop is empty", "k", 3, 1, []string{}},
 		{"missing key is empty", "nope", 0, 5, []string{}},
+
+		{"negative stop -1 means last", "k", 0, -1, []string{"a", "b", "c", "d", "e"}},
+		{"negative range -2 to -1", "k", -2, -1, []string{"d", "e"}},
+		{"negative start clamped to 0", "k", -100, -1, []string{"a", "b", "c", "d", "e"}},
+		{"negative start with positive stop", "k", -3, 3, []string{"c", "d"}},
+		{"negative start beyond negative stop", "k", -1, -2, []string{}},
+		{"both negative, stop too small", "k", 0, -6, []string{}},
+		{"negative range single element", "k", -1, -1, []string{"e"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
