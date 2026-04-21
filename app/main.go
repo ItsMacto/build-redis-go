@@ -77,6 +77,21 @@ func (s *Store) RPush(key string, values []string) int {
 	s.data[key] = e
 	return len(e.list)
 }
+
+func (s *Store) LRANGE(key string, start, stop int) ([]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	e, ok := s.data[key]
+	if !ok || e.dataType != typeList || start >= len(e.list) || start > stop {
+		return []string{}, false
+	}
+	start = max(0, start)
+	end := min(len(e.list), stop+1)
+
+	return e.list[start:end], true
+}
+
 func main() {
 	fmt.Println("Logs from your program will appear here!")
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
@@ -148,6 +163,18 @@ func dispatch(args []string, store *Store) []byte {
 			return []byte("-ERR wrong number of arguments for 'rpush'\r\n")
 		}
 		return fmt.Appendf(nil, ":%d\r\n", store.RPush(args[1], args[2:]))
+
+	case "LRANGE":
+		if len(args) < 4 {
+			return []byte("-ERR wrong number of arguments for 'lrange'\r\n")
+		}
+		start, err1 := strconv.Atoi(args[2])
+		stop, err2 := strconv.Atoi(args[3])
+		if err1 != nil || err2 != nil {
+			return []byte("-ERR value is not an integer or out of range\r\n")
+		}
+		res, _ := store.LRANGE(args[1], start, stop)
+		return encodeRESPArray(res)
 	default:
 		return []byte("-ERR unknown command\r\n")
 	}
@@ -206,7 +233,7 @@ func decodeCommand(r *bufio.Reader) ([]string, error) {
 	}
 
 	args := make([]string, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		header, err := readLine(r)
 		if err != nil {
 			return nil, err
@@ -244,4 +271,12 @@ func encodeBulkString(s string) []byte {
 
 func encodeSimpleString(s string) []byte {
 	return fmt.Appendf(nil, "+%s\r\n", s)
+}
+
+func encodeRESPArray(elements []string) []byte {
+	res := fmt.Appendf(nil, "*%d\r\n", len(elements))
+	for i := range elements {
+		res = append(res, encodeBulkString(elements[i])...)
+	}
+	return res
 }
