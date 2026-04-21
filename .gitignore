@@ -1,0 +1,19 @@
+# Build output
+/tmp/
+codecrafters-build-*
+*.test
+*.out
+
+# Go workspace files (only relevant if you add multi-module setup later)
+go.work
+go.work.sum
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Claude Code — personal, not shared
+.claude/settings.local.json
