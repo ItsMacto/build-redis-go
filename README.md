@@ -1,10 +1,7 @@
-[![progress-banner](https://backend.codecrafters.io/progress/redis/326f8c37-66ed-442e-b86d-26c35d869c4c)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
-
 # Redis (Go)
 
-A toy Redis clone built in Go, as a way to learn the language through the
-[CodeCrafters "Build Your Own Redis"](https://codecrafters.io/challenges/redis)
-challenge. Speaks the RESP protocol over TCP and handles a growing set of
+A Redis clone built in Go, as a way to learn the language
+. Speaks the RESP protocol over TCP and handles a growing set of
 Redis commands.
 
 ## Implemented
@@ -38,11 +35,13 @@ your_program.sh     — local build + run wrapper
 Requires Go 1.26+.
 
 Start the server:
+
 ```sh
 ./your_program.sh
 ```
 
 Talk to it from another terminal with `redis-cli`:
+
 ```sh
 redis-cli PING
 redis-cli SET foo bar
@@ -54,6 +53,7 @@ redis-cli LRANGE mylist 0 -1
 ## Testing
 
 Unit tests:
+
 ```sh
 go test ./app/
 go test -v ./app/                    # verbose output
@@ -62,6 +62,7 @@ go test -run TestDispatch_SET ./app/ # filter by test name
 ```
 
 Run the CodeCrafters test suite locally, without submitting:
+
 ```sh
 codecrafters test
 ```
@@ -71,5 +72,6 @@ codecrafters test
 ```sh
 codecrafters submit
 ```
+
 This commits any pending changes (with `[skip ci]` in the message so GitHub Actions
 skips them) and pushes to `origin/master`, where CodeCrafters' CI grades the stage.

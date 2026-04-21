@@ -66,6 +66,48 @@ func TestStore_RPush(t *testing.T) {
 	}
 }
 
+func TestStore_LPush(t *testing.T) {
+	// single element into empty list
+	s1 := NewStore()
+	if n := s1.LPush("k", []string{"a"}); n != 1 {
+		t.Fatalf("single: len = %d, want 1", n)
+	}
+	got, _ := s1.LRange("k", 0, -1)
+	if !slices.Equal(got, []string{"a"}) {
+		t.Fatalf("single: got %v, want [a]", got)
+	}
+
+	// multiple elements in one call reverse their order (Redis LPUSH semantics)
+	s2 := NewStore()
+	if n := s2.LPush("k", []string{"a", "b", "c"}); n != 3 {
+		t.Fatalf("multi: len = %d, want 3", n)
+	}
+	got, _ = s2.LRange("k", 0, -1)
+	if !slices.Equal(got, []string{"c", "b", "a"}) {
+		t.Fatalf("multi: got %v, want [c b a]", got)
+	}
+
+	// successive LPush calls keep prepending
+	s3 := NewStore()
+	s3.LPush("k", []string{"a"})
+	if n := s3.LPush("k", []string{"b", "c"}); n != 3 {
+		t.Fatalf("successive: len = %d, want 3", n)
+	}
+	got, _ = s3.LRange("k", 0, -1)
+	if !slices.Equal(got, []string{"c", "b", "a"}) {
+		t.Fatalf("successive: got %v, want [c b a]", got)
+	}
+
+	// LPush prepends to a list populated via RPush
+	s4 := NewStore()
+	s4.RPush("k", []string{"a", "b"})
+	s4.LPush("k", []string{"c"})
+	got, _ = s4.LRange("k", 0, -1)
+	if !slices.Equal(got, []string{"c", "a", "b"}) {
+		t.Fatalf("interop: got %v, want [c a b]", got)
+	}
+}
+
 func TestStore_LRange(t *testing.T) {
 	s := NewStore()
 	s.RPush("k", []string{"a", "b", "c", "d", "e"})

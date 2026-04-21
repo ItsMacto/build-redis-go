@@ -95,6 +95,21 @@ func TestDispatch_LRANGE(t *testing.T) {
 	}
 }
 
+func TestDispatch_LPUSH(t *testing.T) {
+	s := NewStore()
+
+	if got := string(dispatch([]string{"LPUSH", "k", "c"}, s)); got != ":1\r\n" {
+		t.Fatalf("first LPUSH got %q", got)
+	}
+	if got := string(dispatch([]string{"LPUSH", "k", "b", "a"}, s)); got != ":3\r\n" {
+		t.Fatalf("multi-arg LPUSH got %q", got)
+	}
+	// Final list should be [a, b, c] per Redis LPUSH semantics.
+	if got := string(dispatch([]string{"LRANGE", "k", "0", "-1"}, s)); got != "*3\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nc\r\n" {
+		t.Fatalf("LRANGE after LPUSH got %q", got)
+	}
+}
+
 func TestDispatch_WrongArity(t *testing.T) {
 	s := NewStore()
 	cases := []struct {
@@ -105,6 +120,7 @@ func TestDispatch_WrongArity(t *testing.T) {
 		{"GET no arg", []string{"GET"}},
 		{"SET one arg", []string{"SET", "k"}},
 		{"RPUSH no value", []string{"RPUSH", "k"}},
+		{"LPUSH no value", []string{"LPUSH", "k"}},
 		{"LRANGE missing stop", []string{"LRANGE", "k", "0"}},
 	}
 	for _, tc := range cases {
