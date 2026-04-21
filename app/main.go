@@ -65,7 +65,7 @@ func (s *Store) Get(key string) (string, bool) {
 	return e.value, true
 }
 
-func (s *Store) RPush(key, value string) int {
+func (s *Store) RPush(key string, values []string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -73,7 +73,7 @@ func (s *Store) RPush(key, value string) int {
 	if !ok {
 		e = entry{dataType: typeList}
 	}
-	e.list = append(e.list, value)
+	e.list = append(e.list, []string(values)...)
 	s.data[key] = e
 	return len(e.list)
 }
@@ -147,7 +147,7 @@ func dispatch(args []string, store *Store) []byte {
 		if len(args) < 3 {
 			return []byte("-ERR wrong number of arguments for 'rpush'\r\n")
 		}
-		return fmt.Appendf(nil, ":%d\r\n", store.RPush(args[1], args[2]))
+		return fmt.Appendf(nil, ":%d\r\n", store.RPush(args[1], args[2:]))
 	default:
 		return []byte("-ERR unknown command\r\n")
 	}
