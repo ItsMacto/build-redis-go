@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"sync"
 	"time"
 )
@@ -67,6 +68,22 @@ func (s *Store) RPush(key string, values []string) int {
 	e.list = append(e.list, []string(values)...)
 	s.data[key] = e
 	return len(e.list)
+}
+
+func (s *Store) LPush(key string, values []string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	e, ok := s.data[key]
+	if !ok {
+		e = entry{kind: typeList}
+	}
+	slices.Reverse(values)
+
+	e.list = append(values, e.list...)
+	s.data[key] = e
+	return len(e.list)
+
 }
 
 func (s *Store) LRange(key string, start, stop int) ([]string, bool) {

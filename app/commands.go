@@ -48,6 +48,11 @@ func dispatch(args []string, store *Store) []byte {
 		}
 		res, _ := store.LRange(args[1], start, stop)
 		return encodeRESPArray(res)
+	case "LPUSH":
+		if len(args) < 3 {
+			return []byte("-ERR wrong number of arguments for 'lpush'\r\n")
+		}
+		return fmt.Appendf(nil, ":%d\r\n", store.LPush(args[1], args[2:]))
 	default:
 		return []byte("-ERR unknown command\r\n")
 	}
