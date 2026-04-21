@@ -108,6 +108,30 @@ func TestStore_LPush(t *testing.T) {
 	}
 }
 
+func TestStore_LLen(t *testing.T) {
+	s := NewStore()
+
+	if got := s.LLen("missing"); got != 0 {
+		t.Fatalf("missing key: got %d, want 0", got)
+	}
+
+	s.RPush("k", []string{"a", "b", "c"})
+	if got := s.LLen("k"); got != 3 {
+		t.Fatalf("after RPush: got %d, want 3", got)
+	}
+
+	s.LPush("k", []string{"d", "e"})
+	if got := s.LLen("k"); got != 5 {
+		t.Fatalf("after LPush: got %d, want 5", got)
+	}
+
+	// LLen on a string-typed key returns 0 (wrong type treated as missing for now)
+	s.Set("str", "hello", 0)
+	if got := s.LLen("str"); got != 0 {
+		t.Fatalf("string-typed key: got %d, want 0", got)
+	}
+}
+
 func TestStore_LRange(t *testing.T) {
 	s := NewStore()
 	s.RPush("k", []string{"a", "b", "c", "d", "e"})

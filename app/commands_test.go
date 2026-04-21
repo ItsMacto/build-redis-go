@@ -110,6 +110,19 @@ func TestDispatch_LPUSH(t *testing.T) {
 	}
 }
 
+func TestDispatch_LLEN(t *testing.T) {
+	s := NewStore()
+
+	if got := string(dispatch([]string{"LLEN", "missing"}, s)); got != ":0\r\n" {
+		t.Fatalf("LLEN missing got %q", got)
+	}
+
+	dispatch([]string{"RPUSH", "k", "a", "b", "c"}, s)
+	if got := string(dispatch([]string{"LLEN", "k"}, s)); got != ":3\r\n" {
+		t.Fatalf("LLEN after RPUSH got %q", got)
+	}
+}
+
 func TestDispatch_WrongArity(t *testing.T) {
 	s := NewStore()
 	cases := []struct {
@@ -121,6 +134,7 @@ func TestDispatch_WrongArity(t *testing.T) {
 		{"SET one arg", []string{"SET", "k"}},
 		{"RPUSH no value", []string{"RPUSH", "k"}},
 		{"LPUSH no value", []string{"LPUSH", "k"}},
+		{"LLEN no key", []string{"LLEN"}},
 		{"LRANGE missing stop", []string{"LRANGE", "k", "0"}},
 	}
 	for _, tc := range cases {
