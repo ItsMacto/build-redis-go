@@ -108,7 +108,6 @@ func (s *Store) LRange(key string, start, stop int) ([]string, bool) {
 	if start > stop {
 		return []string{}, false
 	}
-
 	return e.list[start : stop+1], true
 }
 func (s *Store) LLen(key string) int {
@@ -121,4 +120,19 @@ func (s *Store) LLen(key string) int {
 		return 0
 	}
 	return len(e.list)
+}
+func (s *Store) LPop(key string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	e, ok := s.data[key]
+
+	if !ok || e.kind != typeList || len(e.list) == 0 {
+		return "", false
+	}
+	x := e.list[0]
+	e.list = e.list[1:]
+	s.data[key] = e
+
+	return x, true
 }
