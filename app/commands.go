@@ -62,11 +62,20 @@ func dispatch(args []string, store *Store) []byte {
 		if len(args) < 2 {
 			return []byte("-ERR wrong number of arguments for 'lpop'\r\n")
 		}
-		val, ok := store.LPop(args[1])
+		amount := 0
+		if len(args) >= 3 {
+			amt, err := strconv.Atoi(args[2])
+			if err != nil || amt <= 0 {
+				return []byte("-ERR value is not an integer or out of range\r\n")
+			}
+			amount = amt
+		}
+
+		val, ok := store.LPop(args[1], amount)
 		if !ok {
 			return []byte(nullBulkString)
 		}
-		return encodeBulkString(val)
+		return encodeRESPArray(val)
 
 	default:
 		return []byte("-ERR unknown command\r\n")

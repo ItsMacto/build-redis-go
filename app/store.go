@@ -121,18 +121,23 @@ func (s *Store) LLen(key string) int {
 	}
 	return len(e.list)
 }
-func (s *Store) LPop(key string) (string, bool) {
+func (s *Store) LPop(key string, amount int) ([]string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	e, ok := s.data[key]
 
 	if !ok || e.kind != typeList || len(e.list) == 0 {
-		return "", false
+		return []string{}, false
 	}
-	x := e.list[0]
-	e.list = e.list[1:]
+	amount = min(amount, len(e.list))
+	x := e.list[:amount]
+	e.list = e.list[amount:]
 	s.data[key] = e
+
+	// x := e.list[0]
+	// e.list = e.list[1:]
+	// s.data[key] = e
 
 	return x, true
 }
