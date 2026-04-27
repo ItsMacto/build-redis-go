@@ -8,7 +8,10 @@ import (
 	"strings"
 )
 
-const nullBulkString = "$-1\r\n"
+const (
+	nullBulkString = "$-1\r\n"
+	nullArray      = "*-1\r\n"
+)
 
 // decodeCommand reads one RESP array of bulk strings from r.
 func decodeCommand(r *bufio.Reader) ([]string, error) {
