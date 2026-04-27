@@ -80,7 +80,20 @@ func dispatch(args []string, store *Store) []byte {
 		} else {
 			return encodeBulkString(val[0])
 		}
-
+	case "BLPOP":
+		if len(args) < 3 {
+			return []byte("-ERR wrong number of arguments for 'blpop'\r\n")
+		}
+		timeoutSec, err := strconv.ParseFloat(args[2], 64)
+		if err != nil || timeoutSec < 0 {
+			return []byte("-ERR value is not an integer or out of range\r\n")
+		}
+		timeout := time.Duration(timeoutSec * float64(time.Second))
+		val, ok := store.BLPop(args[1], timeout)
+		if !ok {
+			return []byte(nullBulkString)
+		}
+		return encodeRESPArray(val)
 	default:
 		return []byte("-ERR unknown command\r\n")
 	}
